@@ -22,7 +22,9 @@
 #include <stdint.h>
 
 #include "socket.h"
+#ifndef CONFIG_USE_ZEPHYR
 #include "transport_interface.h"
+#endif
 
 struct NetworkContext {
   TcpSocket tcp_socket;
@@ -32,6 +34,9 @@ struct NetworkContext {
   mbedtls_ssl_config conf;
   mbedtls_x509_crt cacert;
 };
+#if CONFIG_USE_ZEPHYR
+typedef struct NetworkContext NetworkContext_t;
+#endif
 
 int ssl_transport_connect(NetworkContext_t* net_ctx,
                           const char* host,
