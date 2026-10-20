@@ -26,7 +26,9 @@
 #include <mbedtls/x509_crt.h>
 #include <mbedtls/x509_csr.h>
 
+#if CONFIG_USE_LIBSRTP
 #include <srtp2/srtp.h>
+#endif
 
 #include "address.h"
 
@@ -64,12 +66,14 @@ typedef struct DtlsSrtp {
   mbedtls_ctr_drbg_context ctr_drbg;
 
   // SRTP
+#if CONFIG_USE_LIBSRTP
   srtp_policy_t remote_policy;
   srtp_policy_t local_policy;
   srtp_t srtp_in;
   srtp_t srtp_out;
   unsigned char remote_policy_key[SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH];
   unsigned char local_policy_key[SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH];
+#endif
 
   int (*udp_send)(void* ctx, const unsigned char* buf, size_t len);
   int (*udp_recv)(void* ctx, unsigned char* buf, size_t len);

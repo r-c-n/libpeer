@@ -460,10 +460,12 @@ void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
     mbedtls_ssl_cookie_free(&dtls_srtp->cookie_ctx);
   }
 
+#ifndef CONFIG_USE_ZEPHYR
   if (dtls_srtp->state == DTLS_SRTP_STATE_CONNECTED) {
     srtp_dealloc(dtls_srtp->srtp_in);
     srtp_dealloc(dtls_srtp->srtp_out);
   }
+#endif
 
   dtls_srtp->initialized = 0;
 }
@@ -519,6 +521,7 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   }
   // derive inbounds keys
 
+#ifndef CONFIG_USE_ZEPHYR
   memset(&dtls_srtp->remote_policy, 0, sizeof(dtls_srtp->remote_policy));
 
   srtp_crypto_policy_set_rtp_default(&dtls_srtp->remote_policy.rtp);
@@ -557,6 +560,8 @@ static int dtls_srtp_key_derivation(DtlsSrtp* dtls_srtp, const unsigned char* ma
   }
 
   LOGI("Created outbound SRTP session");
+#endif
+
   return 0;
 }
 
@@ -746,17 +751,34 @@ int dtls_srtp_probe(uint8_t* buf) {
 }
 
 void dtls_srtp_decrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+#if CONFIG_USE_ZEPHYR
+  LOGE("[%s] not implemented", __func__);
+#else
   srtp_unprotect(dtls_srtp->srtp_in, packet, bytes);
+#endif
 }
 
 void dtls_srtp_decrypt_rtcp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+#if CONFIG_USE_ZEPHYR
+  LOGE("[%s] not implemented", __func__);
+#else
   srtp_unprotect_rtcp(dtls_srtp->srtp_in, packet, bytes);
+#endif
 }
 
 int dtls_srtp_encrypt_rtp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+#if CONFIG_USE_ZEPHYR
+  LOGE("[%s] not implemented", __func__);
+  return -1;
+#else
   return (int)srtp_protect(dtls_srtp->srtp_out, packet, bytes);
+#endif
 }
 
 void dtls_srtp_encrypt_rctp_packet(DtlsSrtp* dtls_srtp, uint8_t* packet, int* bytes) {
+#if CONFIG_USE_ZEPHYR
+  LOGE("[%s] not implemented", __func__);
+#else
   srtp_protect_rtcp(dtls_srtp->srtp_out, packet, bytes);
+#endif
 }
