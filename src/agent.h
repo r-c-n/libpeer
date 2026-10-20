@@ -24,6 +24,8 @@
 #define AGENT_MAX_CANDIDATE_PAIRS 100
 #endif
 
+#define MAX_MID_LEN 32
+
 typedef enum AgentMode {
 
   AGENT_MODE_CONTROLLED = 0,
@@ -31,11 +33,21 @@ typedef enum AgentMode {
 
 } AgentMode;
 
+typedef enum MediaType {
+  MEDIA_TYPE_VIDEO = 0,
+  MEDIA_TYPE_AUDIO,
+  MEDIA_TYPE_DATA,
+
+  MEDIA_TYPE_N_ELEMS,
+} MediaType;
+
+
 typedef struct Agent Agent;
 
 struct Agent {
   char remote_ufrag[ICE_UFRAG_LENGTH + 1];
   char remote_upwd[ICE_UPWD_LENGTH + 1];
+  char *remote_mid[MEDIA_TYPE_N_ELEMS];
 
   char local_ufrag[ICE_UFRAG_LENGTH + 1];
   char local_upwd[ICE_UPWD_LENGTH + 1];

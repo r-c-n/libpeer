@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "agent.h"
 #include "sdp.h"
 
 int sdp_append(char* sdp, const char* format, ...) {
@@ -26,7 +27,7 @@ void sdp_reset(char* sdp) {
   memset(sdp, 0, CONFIG_SDP_BUFFER_SIZE);
 }
 
-void sdp_append_h264(char* sdp) {
+void sdp_append_h264(char* sdp, char *mid) {
   sdp_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 96");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-fb:96 nack");
@@ -35,11 +36,15 @@ void sdp_append_h264(char* sdp) {
   sdp_append(sdp, "a=rtpmap:96 H264/90000");
   sdp_append(sdp, "a=ssrc:1 cname:webrtc-h264");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:1");
+  if (mid) {
+    sdp_append(sdp, "a=mid:%s", mid);
+  } else {
+    sdp_append(sdp, "a=mid:1");
+  }
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_vp8(char* sdp) {
+void sdp_append_vp8(char* sdp, char *mid) {
   sdp_append(sdp, "m=video 9 UDP/TLS/RTP/SAVPF 97");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtcp-fb:97 nack");
@@ -47,49 +52,69 @@ void sdp_append_vp8(char* sdp) {
   sdp_append(sdp, "a=rtpmap:97 VP8/90000");
   sdp_append(sdp, "a=ssrc:1 cname:webrtc-vp8");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:1");
+  if (mid) {
+    sdp_append(sdp, "a=mid:%s", mid);
+  } else {
+    sdp_append(sdp, "a=mid:1");
+  }
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_pcma(char* sdp) {
+void sdp_append_pcma(char* sdp, char *mid) {
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 8");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtpmap:8 PCMA/8000");
   sdp_append(sdp, "a=ssrc:4 cname:webrtc-pcma");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:2");
+  if (mid) {
+    sdp_append(sdp, "a=mid:%s", mid);
+  } else {
+    sdp_append(sdp, "a=mid:2");
+  }
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_pcmu(char* sdp) {
+void sdp_append_pcmu(char* sdp, char *mid) {
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 0");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtpmap:0 PCMU/8000");
   sdp_append(sdp, "a=ssrc:5 cname:webrtc-pcmu");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:2");
+  if (mid) {
+    sdp_append(sdp, "a=mid:%s", mid);
+  } else {
+    sdp_append(sdp, "a=mid:2");
+  }
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_opus(char* sdp) {
+void sdp_append_opus(char* sdp, char *mid) {
   sdp_append(sdp, "m=audio 9 UDP/TLS/RTP/SAVP 111");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
   sdp_append(sdp, "a=rtpmap:111 opus/48000/2");
   sdp_append(sdp, "a=ssrc:6 cname:webrtc-opus");
   sdp_append(sdp, "a=sendrecv");
-  sdp_append(sdp, "a=mid:2");
+  if (mid) {
+    sdp_append(sdp, "a=mid:%s", mid);
+  } else {
+    sdp_append(sdp, "a=mid:2");
+  }
   sdp_append(sdp, "a=rtcp-mux");
 }
 
-void sdp_append_datachannel(char* sdp) {
+void sdp_append_datachannel(char* sdp, char *mid) {
   sdp_append(sdp, "m=application 50712 UDP/DTLS/SCTP webrtc-datachannel");
   sdp_append(sdp, "c=IN IP4 0.0.0.0");
-  sdp_append(sdp, "a=mid:0");
+  if (mid) {
+    sdp_append(sdp, "a=mid:%s", mid);
+  } else {
+    sdp_append(sdp, "a=mid:0");
+  }
   sdp_append(sdp, "a=sctp-port:5000");
   sdp_append(sdp, "a=max-message-size:262144");
 }
 
-void sdp_create(char* sdp, int b_video, int b_audio, int b_datachannel) {
+void sdp_create(char* sdp, int b_video, int b_audio, int b_datachannel, char **mid) {
   char bundle[64];
   sdp_append(sdp, "v=0");
   sdp_append(sdp, "o=- 1495799811084970 1495799811084970 IN IP4 0.0.0.0");
@@ -101,18 +126,30 @@ void sdp_create(char* sdp, int b_video, int b_audio, int b_datachannel) {
 #endif
   memset(bundle, 0, sizeof(bundle));
 
-  strcat(bundle, "a=group:BUNDLE");
+  strcat(bundle, "a=group:BUNDLE ");
 
   if (b_datachannel) {
-    strcat(bundle, " 0");
+    if (mid && mid[MEDIA_TYPE_DATA]) {
+      strcat(bundle, mid[MEDIA_TYPE_DATA]);
+    } else {
+      strcat(bundle, "0");
+    }
   }
 
   if (b_video) {
-    strcat(bundle, " 1");
+    if (mid && mid[MEDIA_TYPE_VIDEO]) {
+      strcat(bundle, mid[MEDIA_TYPE_VIDEO]);
+    } else {
+      strcat(bundle, "1");
+    }
   }
 
   if (b_audio) {
-    strcat(bundle, " 2");
+    if (mid && mid[MEDIA_TYPE_AUDIO]) {
+      strcat(bundle, mid[MEDIA_TYPE_AUDIO]);
+    } else {
+      strcat(bundle, "2");
+    }
   }
 
   sdp_append(sdp, bundle);

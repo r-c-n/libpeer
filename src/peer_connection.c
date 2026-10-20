@@ -491,13 +491,14 @@ void peer_connection_set_local_description(PeerConnection* pc, const char* sdp, 
 
 static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_type) {
   char* description = (char*)pc->temp_buf;
+  char **mid = (sdp_type == SDP_TYPE_ANSWER) ? pc->agent.remote_mid : NULL;
   memset(pc->temp_buf, 0, sizeof(pc->temp_buf));
   memset(pc->sdp, 0, sizeof(pc->sdp));
   // TODO: check if we have video or audio codecs
   int sdp_audio = (pc->config.audio_codec != CODEC_NONE) && (sdp_type == SDP_TYPE_OFFER || pc->remote_assrc > 0);
   int sdp_video = (pc->config.video_codec != CODEC_NONE) && (sdp_type == SDP_TYPE_OFFER || pc->remote_vssrc > 0);
 
-  sdp_create(pc->sdp, sdp_video, sdp_audio, pc->config.datachannel);
+  sdp_create(pc->sdp, sdp_video, sdp_audio, pc->config.datachannel, mid);
 
   sdp_append(pc->sdp, "a=ice-ufrag:%s", pc->agent.local_ufrag);
   sdp_append(pc->sdp, "a=ice-pwd:%s", pc->agent.local_upwd);
@@ -505,12 +506,17 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   sdp_append(pc->sdp, peer_connection_dtls_role_setup_value(pc->role));
 
   if (sdp_video) {
+    char *video_mid = NULL;
+
+    if (mid != NULL && mid[MEDIA_TYPE_VIDEO] != NULL) {
+      video_mid = mid[MEDIA_TYPE_VIDEO];
+    }
     switch (pc->config.video_codec) {
       case CODEC_H264:
-        sdp_append_h264(pc->sdp);
+        sdp_append_h264(pc->sdp, video_mid);
         break;
       case CODEC_VP8:
-        sdp_append_vp8(pc->sdp);
+        sdp_append_vp8(pc->sdp, video_mid);
         break;
       default:
         LOGE("Video codec not supported");
@@ -519,15 +525,20 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   }
 
   if (sdp_audio) {
+    char *audio_mid = NULL;
+
+    if (mid != NULL && mid[MEDIA_TYPE_AUDIO] != NULL) {
+      audio_mid = mid[MEDIA_TYPE_AUDIO];
+    }
     switch (pc->config.audio_codec) {
       case CODEC_PCMA:
-        sdp_append_pcma(pc->sdp);
+        sdp_append_pcma(pc->sdp, audio_mid);
         break;
       case CODEC_PCMU:
-        sdp_append_pcmu(pc->sdp);
+        sdp_append_pcmu(pc->sdp, audio_mid);
         break;
       case CODEC_OPUS:
-        sdp_append_opus(pc->sdp);
+        sdp_append_opus(pc->sdp, audio_mid);
       default:
         LOGI("Audio codec not supported");
         break;
@@ -535,7 +546,12 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
   }
 
   if (pc->config.datachannel) {
-    sdp_append_datachannel(pc->sdp);
+    char *data_mid = NULL;
+
+    if (mid != NULL && mid[MEDIA_TYPE_DATA] != NULL) {
+      data_mid = mid[MEDIA_TYPE_DATA];
+    }
+    sdp_append_datachannel(pc->sdp, data_mid);
   }
 
   agent_get_local_description(&pc->agent, description, sizeof(pc->temp_buf));

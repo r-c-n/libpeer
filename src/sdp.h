@@ -10,19 +10,19 @@
 #define ICE_LITE 0
 #endif
 
-void sdp_append_h264(char* sdp);
+void sdp_append_h264(char* sdp, char *mid);
 
-void sdp_append_vp8(char* sdp);
+void sdp_append_vp8(char* sdp, char *mid);
 
-void sdp_append_pcma(char* sdp);
+void sdp_append_pcma(char* sdp, char *mid);
 
-void sdp_append_pcmu(char* sdp);
+void sdp_append_pcmu(char* sdp, char *mid);
 
-void sdp_append_opus(char* sdp);
+void sdp_append_opus(char* sdp, char *mid);
 
-void sdp_append_datachannel(char* sdp);
+void sdp_append_datachannel(char* sdp, char *mid);
 
-void sdp_create(char* sdp, int b_video, int b_audio, int b_datachannel);
+void sdp_create(char* sdp, int b_video, int b_audio, int b_datachannel, char **mid);
 
 int sdp_append(char* sdp, const char* format, ...);
 

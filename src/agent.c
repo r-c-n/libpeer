@@ -42,12 +42,19 @@ int agent_create(Agent* agent) {
   agent_clear_candidates(agent);
   memset(agent->remote_ufrag, 0, sizeof(agent->remote_ufrag));
   memset(agent->remote_upwd, 0, sizeof(agent->remote_upwd));
+  memset(agent->remote_mid, 0, sizeof(agent->remote_mid));
+
   return 0;
 }
 
 void agent_destroy(Agent* agent) {
   if (agent->udp_sockets[0].fd > 0) {
     udp_socket_close(&agent->udp_sockets[0]);
+  }
+  for (int i = 0; i < MEDIA_TYPE_N_ELEMS; i++) {
+    if (agent->remote_mid[i] != NULL) {
+      free(agent->remote_mid[i]);
+    }
   }
 
 #if CONFIG_IPV6
@@ -432,8 +439,24 @@ void agent_set_remote_description(Agent* agent, char* description) {
 
   char* line_start = description;
   char* line_end = NULL;
+  int media_type = -1;
 
-  while ((line_end = strstr(line_start, "\r\n")) != NULL) {
+  for (; (line_end = strstr(line_start, "\r\n")) != NULL; line_start = line_end + 2) {
+    if (strncmp(line_start, "m=", strlen("m=")) == 0) {
+      if (strstr(line_start, "video")) {
+        media_type = MEDIA_TYPE_VIDEO;
+      }
+      else if (strstr(line_start, "audio")) {
+        media_type = MEDIA_TYPE_AUDIO;
+      }
+      else if (strstr(line_start, "application")) {
+        media_type = MEDIA_TYPE_DATA;
+      }
+      else {
+        LOGE("Unrecognized media type: %s", line_start);
+	media_type = -1;
+      }
+    }
     if (strncmp(line_start, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
       strncpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), line_end - line_start - strlen("a=ice-ufrag:"));
 
@@ -451,13 +474,35 @@ void agent_set_remote_description(Agent* agent, char* description) {
           agent->remote_candidates_count++;
         }
       }
+    } else if (strncmp(line_start, "a=mid:", strlen("a=mid:")) == 0) {
+      if (media_type < 0) {
+        continue;
+      }
+      if (agent->remote_mid[media_type] != NULL) {
+        LOGI("Multiple mid values for the same media type. Keeping only the first one");
+	continue;
+      }
+      agent->remote_mid[media_type] = calloc(1, MAX_MID_LEN + 1);
+      if (agent->remote_mid[media_type] == NULL) {
+	LOGE("calloc()");
+	continue;
+      }
+      if ((line_end - line_start - strlen("a=mid:")) > MAX_MID_LEN) {
+	LOGE("Remote mid too long: %s (buffer len: %d)", line_start, MAX_MID_LEN);
+	continue;
+      }
+      memcpy(agent->remote_mid[media_type], line_start + strlen("a=mid:"),
+	     line_end - line_start - strlen("a=mid:"));
+      agent->remote_mid[media_type][MAX_MID_LEN] = '\0';
     }
-
-    line_start = line_end + 2;
   }
 
   LOGD("remote ufrag: %s", agent->remote_ufrag);
   LOGD("remote upwd: %s", agent->remote_upwd);
+  LOGD("remote mids: video = %s, audio = %s, data = %s",
+        agent->remote_mid[MEDIA_TYPE_VIDEO] ? agent->remote_mid[MEDIA_TYPE_VIDEO] : "none",
+        agent->remote_mid[MEDIA_TYPE_AUDIO] ? agent->remote_mid[MEDIA_TYPE_AUDIO] : "none",
+        agent->remote_mid[MEDIA_TYPE_DATA] ? agent->remote_mid[MEDIA_TYPE_DATA] : "none");
 }
 
 void agent_update_candidate_pairs(Agent* agent) {
