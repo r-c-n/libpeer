@@ -4,6 +4,7 @@
 #include "socket.h"
 #include "utils.h"
 
+#ifndef CONFIG_USE_ZEPHYR
 int udp_socket_add_multicast_group(UdpSocket* udp_socket, Address* mcast_addr) {
   int ret = 0;
   struct ip_mreq imreq = {0};
@@ -25,6 +26,7 @@ int udp_socket_add_multicast_group(UdpSocket* udp_socket, Address* mcast_addr) {
 
   return 0;
 }
+#endif
 
 int udp_socket_open(UdpSocket* udp_socket, int family, int port) {
   int ret;
