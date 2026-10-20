@@ -44,10 +44,20 @@ int dtls_srtp_udp_recv(void* ctx, uint8_t* buf, size_t len) {
 static void dtls_srtp_x509_digest(const mbedtls_x509_crt* crt, char* buf) {
   int i;
   unsigned char digest[32];
+#if MBEDTLS_VERSION_NUMBER >= 0x04010000
+  size_t len;
+  int ret = psa_hash_compute(PSA_ALG_SHA_256, crt->raw.p, crt->raw.len,
+		             (unsigned char*)digest, sizeof(digest), &len);
+  if (ret != PSA_SUCCESS) {
+    memset(digest, 0, sizeof(digest));
+    LOGE("psa_hash_compute: %d", ret);
+  }
+#else
   const mbedtls_md_info_t* md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
   if (md_info == NULL || mbedtls_md(md_info, crt->raw.p, crt->raw.len, digest) != 0) {
     memset(digest, 0, sizeof(digest));
   }
+#endif
 
   for (i = 0; i < 32; i++) {
     snprintf(buf, 4, "%.2X:", digest[i]);
@@ -335,8 +345,10 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
 
   mbedtls_x509_crt_init(&dtls_srtp->cert);
   mbedtls_pk_init(&dtls_srtp->pkey);
+#if MBEDTLS_VERSION_NUMBER < 0x04010000
   mbedtls_entropy_init(&dtls_srtp->entropy);
   mbedtls_ctr_drbg_init(&dtls_srtp->ctr_drbg);
+#endif
   dtls_srtp->initialized = 1;
 
 #if MBEDTLS_VERSION_NUMBER >= 0x04000000
@@ -446,8 +458,10 @@ void dtls_srtp_deinit(DtlsSrtp* dtls_srtp) {
 
   mbedtls_x509_crt_free(&dtls_srtp->cert);
   mbedtls_pk_free(&dtls_srtp->pkey);
+#if MBEDTLS_VERSION_NUMBER < 0x04010000
   mbedtls_entropy_free(&dtls_srtp->entropy);
   mbedtls_ctr_drbg_free(&dtls_srtp->ctr_drbg);
+#endif
 
 #if MBEDTLS_VERSION_NUMBER >= 0x04000000
   if (dtls_srtp->psa_key_id != MBEDTLS_SVC_KEY_ID_INIT) {
@@ -601,17 +615,141 @@ static void dtls_srtp_key_derivation_cb(void* context,
 #endif
 }
 
+#if LOG_LEVEL >= LEVEL_DEBUG
+/*
+ * Callback to output (print) the client random number and pre-master
+ * secret in NSS keylog format for DTLS decryption on a packet capture.
+ */
+static void nss_keylog_export(void *p_expkey,
+                              mbedtls_ssl_key_export_type secret_type,
+                              const unsigned char *secret,
+                              size_t secret_len,
+                              const unsigned char client_random[32],
+                              const unsigned char server_random[32],
+                              mbedtls_tls_prf_types tls_prf_type)
+{
+    char nss_keylog_line[200];
+    size_t const client_random_len = 32;
+    size_t len = 0;
+    size_t j;
+
+    /* We're only interested in the TLS 1.2 master secret */
+    if (secret_type != MBEDTLS_SSL_KEY_EXPORT_TLS12_MASTER_SECRET) {
+        return;
+    }
+
+    ((void) p_expkey);
+    ((void) server_random);
+    ((void) tls_prf_type);
+
+    len += sprintf(nss_keylog_line + len,
+                   "%s", "CLIENT_RANDOM ");
+
+    for (j = 0; j < client_random_len; j++) {
+        len += sprintf(nss_keylog_line + len,
+                       "%02x", client_random[j]);
+    }
+
+    len += sprintf(nss_keylog_line + len, " ");
+
+    for (j = 0; j < secret_len; j++) {
+        len += sprintf(nss_keylog_line + len,
+                       "%02x", secret[j]);
+    }
+
+    len += sprintf(nss_keylog_line + len, "\n");
+    nss_keylog_line[len] = '\0';
+
+    LOGI("\n");
+    LOGI("---------------- NSS KEYLOG -----------------\n");
+    LOGI("%s", nss_keylog_line);
+    LOGI("---------------------------------------------\n");
+
+    mbedtls_platform_zeroize(nss_keylog_line,
+                             sizeof(nss_keylog_line));
+}
+#endif
+
+#if CONFIG_USE_ZEPHYR
+/* Timer context for DTLS. */
+struct dtls_timing_context {
+  /** Current time, stored during timer set. */
+  uint32_t snapshot;
+
+  /** Intermediate delay value. For details, refer to Mbed TLS API
+   *  documentation (mbedtls_ssl_set_timer_t).
+   */
+  uint32_t int_ms;
+
+  /** Final delay value. For details, refer to Mbed TLS API documentation
+   *  (mbedtls_ssl_set_timer_t).
+   */
+  uint32_t fin_ms;
+};
+
+/* Mbed TLS-defined function for setting timer. */
+static void dtls_timing_set_delay(void *data, uint32_t int_ms, uint32_t fin_ms)
+{
+  struct dtls_timing_context *ctx = data;
+
+  ctx->int_ms = int_ms;
+  ctx->fin_ms = fin_ms;
+
+  if (fin_ms != 0U) {
+    ctx->snapshot = k_uptime_get_32();
+  }
+}
+
+/* Mbed TLS-defined function for getting timer status.
+ * The return values are specified by Mbed TLS. The callback must return:
+ *   -1 if cancelled (fin_ms == 0),
+ *    0 if none of the delays have passed,
+ *    1 if only the intermediate delay has passed,
+ *    2 if the final delay has passed.
+ */
+static int dtls_timing_get_delay(void *data)
+{
+  struct dtls_timing_context *timing = data;
+  unsigned long elapsed_ms;
+
+  NET_ASSERT(timing);
+
+  if (timing->fin_ms == 0U) {
+    return -1;
+  }
+
+  elapsed_ms = k_uptime_get_32() - timing->snapshot;
+
+  if (elapsed_ms >= timing->fin_ms) {
+    return 2;
+  }
+
+  if (elapsed_ms >= timing->int_ms) {
+    return 1;
+  }
+
+  return 0;
+}
+#endif
+
 static int dtls_srtp_do_handshake(DtlsSrtp* dtls_srtp) {
   int ret;
 
   static mbedtls_timing_delay_context timer;
 
+#if CONFIG_USE_ZEPHYR
+  mbedtls_ssl_set_timer_cb(&dtls_srtp->ssl, &timer, dtls_timing_set_delay, dtls_timing_get_delay);
+#else
   mbedtls_ssl_set_timer_cb(&dtls_srtp->ssl, &timer, mbedtls_timing_set_delay, mbedtls_timing_get_delay);
+#endif
 
 #if CONFIG_MBEDTLS_2_X
   mbedtls_ssl_conf_export_keys_ext_cb(&dtls_srtp->conf, dtls_srtp_key_derivation_cb, dtls_srtp);
 #else
   mbedtls_ssl_set_export_keys_cb(&dtls_srtp->ssl, dtls_srtp_key_derivation_cb, dtls_srtp);
+#if LOG_LEVEL >= LEVEL_DEBUG
+  mbedtls_ssl_set_export_keys_cb(&dtls_srtp->ssl, nss_keylog_export, NULL);
+#endif
 #endif
 
   mbedtls_ssl_set_bio(&dtls_srtp->ssl, dtls_srtp, dtls_srtp->udp_send, dtls_srtp->udp_recv, NULL);
