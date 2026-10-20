@@ -16,6 +16,10 @@
 #include "ssl_transport.h"
 #include "utils.h"
 
+#if CONFIG_USE_ZEPHYR && CONFIG_MBEDTLS_DEBUG
+#include <zephyr_mbedtls_priv.h>
+#endif
+
 static int ssl_transport_mbedtls_recv_timeout(void* ctx, unsigned char* buf, size_t len, uint32_t timeout) {
   int ret;
   fd_set read_fds;
@@ -100,6 +104,9 @@ int ssl_transport_connect(NetworkContext_t* net_ctx,
     LOGE("ssl set hostname error: -0x%x", (unsigned int)-ret);
     return -1;
   }
+#if CONFIG_USE_ZEPHYR && CONFIG_MBEDTLS_DEBUG
+  mbedtls_ssl_conf_dbg(&net_ctx->conf, zephyr_mbedtls_debug, NULL);
+#endif
 
   memset(&resolved_addr, 0, sizeof(resolved_addr));
   tcp_socket_open(&net_ctx->tcp_socket, AF_INET);
