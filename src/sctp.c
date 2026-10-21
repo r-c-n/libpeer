@@ -501,6 +501,8 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
 #endif
 }
 
+#if CONFIG_USE_USRSCTP
+
 static int sctp_handle_incoming_data(Sctp* sctp, char* data, size_t len, uint32_t ppid, uint16_t sid, int flags) {
 #if CONFIG_USE_USRSCTP
   switch (ppid) {
@@ -524,8 +526,6 @@ static int sctp_handle_incoming_data(Sctp* sctp, char* data, size_t len, uint32_
 #endif
   return 0;
 }
-
-#if CONFIG_USE_USRSCTP
 
 static void sctp_process_notification(Sctp* sctp, union sctp_notification* notification, size_t len) {
   if (notification->sn_header.sn_length != (uint32_t)len) {
