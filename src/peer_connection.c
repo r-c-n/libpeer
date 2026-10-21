@@ -512,6 +512,9 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
       case CODEC_VP8:
         sdp_append_vp8(pc->sdp);
         break;
+      default:
+        LOGE("Video codec not supported");
+        break;
     }
   }
 
@@ -526,6 +529,7 @@ static const char* peer_connection_create_sdp(PeerConnection* pc, SdpType sdp_ty
       case CODEC_OPUS:
         sdp_append_opus(pc->sdp);
       default:
+        LOGI("Audio codec not supported");
         break;
     }
   }
