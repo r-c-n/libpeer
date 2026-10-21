@@ -13,8 +13,6 @@
 #include "utils.h"
 
 #define AGENT_POLL_TIMEOUT 1
-#define AGENT_CONNCHECK_MAX 1000
-#define AGENT_CONNCHECK_PERIOD 100
 #define AGENT_STUN_RECV_MAXTIMES 1000
 
 void agent_clear_candidates(Agent* agent) {
@@ -547,7 +545,7 @@ int agent_connectivity_check(Agent* agent) {
     return -1;
   }
 
-  if (agent->nominated_pair->conncheck % AGENT_CONNCHECK_PERIOD == 0) {
+  if (agent->nominated_pair->conncheck % CONFIG_AGENT_CONNCHECK_PERIOD == 0) {
     addr_to_string(&agent->nominated_pair->remote->addr, addr_string, sizeof(addr_string));
     LOGD("send binding request to remote ip: %s, port: %d", addr_string, agent->nominated_pair->remote->addr.port);
     agent_send_binding_request(agent);
@@ -574,7 +572,7 @@ int agent_select_candidate_pair(Agent* agent) {
       return 0;
     } else if (agent->candidate_pairs[i].state == ICE_CANDIDATE_STATE_INPROGRESS) {
       agent->candidate_pairs[i].conncheck++;
-      if (agent->candidate_pairs[i].conncheck < AGENT_CONNCHECK_MAX) {
+      if (agent->candidate_pairs[i].conncheck < CONFIG_AGENT_CONNCHECK_MAX) {
         return 0;
       }
       agent->candidate_pairs[i].state = ICE_CANDIDATE_STATE_FAILED;
