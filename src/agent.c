@@ -259,7 +259,6 @@ void agent_gather_candidate(Agent* agent, const char* urls, const char* username
   }
 
   port = atoi(pos + 1);
-  printf("port => %s\n", pos + 1);
   if (port <= 0) {
     LOGE("Cannot parse port");
     return;
