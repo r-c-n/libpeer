@@ -471,6 +471,10 @@ void peer_connection_set_local_description(PeerConnection* pc, const char* sdp, 
       break;
   }
 
+  pc->dtls_srtp.cert_buf = pc->config.dtls_cert;
+  pc->dtls_srtp.cert_buf_size = pc->config.dtls_cert_size;
+  pc->dtls_srtp.pkey_buf = pc->config.dtls_pkey;
+  pc->dtls_srtp.pkey_buf_size = pc->config.dtls_pkey_size;
   if (dtls_srtp_init(&pc->dtls_srtp, pc->role, pc) != 0) {
     LOGE("dtls_srtp_init failed");
     STATE_CHANGED(pc, PEER_CONNECTION_FAILED);
