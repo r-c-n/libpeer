@@ -78,6 +78,10 @@ typedef struct PeerConfiguration {
   void (*on_request_keyframe)(void* userdata);
   void* user_data;
 
+  const char *dtls_cert;
+  size_t dtls_cert_size;
+  const char *dtls_pkey;
+  size_t dtls_pkey_size;
 } PeerConfiguration;
 
 typedef struct PeerConnection PeerConnection;

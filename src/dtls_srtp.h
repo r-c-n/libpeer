@@ -62,6 +62,10 @@ typedef struct DtlsSrtp {
 #endif
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr_drbg;
+  const char *cert_buf;
+  size_t cert_buf_size;
+  const char *pkey_buf;
+  size_t pkey_buf_size;
 
   // SRTP
   srtp_policy_t remote_policy;

@@ -385,10 +385,23 @@ int dtls_srtp_init(DtlsSrtp* dtls_srtp, DtlsSrtpRole role, void* user_data) {
   mbedtls_ssl_conf_dbg(&dtls_srtp->conf, dtls_srtp_debug, NULL);
 #endif
 
-  ret = dtls_srtp_selfsign_cert(dtls_srtp);
-  if (ret != 0) {
-    LOGE("dtls_srtp_selfsign_cert failed -0x%.4x", (unsigned int)-ret);
-    return -1;
+  if (dtls_srtp->cert_buf == NULL || dtls_srtp->pkey_buf == NULL) {
+    ret = dtls_srtp_selfsign_cert(dtls_srtp);
+    if (ret != 0) {
+      LOGE("dtls_srtp_selfsign_cert failed -0x%.4x", (unsigned int)-ret);
+      return -1;
+    }
+  } else {
+    ret = mbedtls_x509_crt_parse_der(&dtls_srtp->cert, dtls_srtp->cert_buf, dtls_srtp->cert_buf_size);
+    if (ret != 0) {
+      LOGE("mbedtls_x509_crt_parse_der: -0x%.4x", (unsigned int)-ret);
+      return -1;
+    }
+    ret = mbedtls_pk_parse_key(&dtls_srtp->pkey, dtls_srtp->pkey_buf, dtls_srtp->pkey_buf_size, NULL, 0);
+    if (ret != 0) {
+      LOGE("mbedtls_pk_parse_key: -0x%.4x", (unsigned int)-ret);
+      return -1;
+    }
   }
 
   mbedtls_ssl_conf_verify(&dtls_srtp->conf, dtls_srtp_cert_verify, NULL);
