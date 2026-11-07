@@ -396,7 +396,10 @@ void peer_connection_set_remote_description(PeerConnection* pc, const char* sdp,
   Agent* agent = &pc->agent;
 
   while ((line = strstr(start, "\r\n"))) {
-    line = strstr(start, "\r\n");
+    if (line - start >= sizeof(buf)) {
+      LOGE("SDP line too long");
+      return;
+    }
     strncpy(buf, start, line - start);
     buf[line - start] = '\0';
 
