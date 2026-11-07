@@ -379,30 +379,38 @@ void sctp_incoming_data(Sctp* sctp, char* buf, size_t len) {
         if (chunk_len < sizeof(SctpInitChunk)) {
           return;
         }
-        SctpInitChunk* init_ack = (SctpInitChunk*)in_packet->chunks;
+        SctpInitChunk* init_ack = (SctpInitChunk*)chunk_common;
         SctpCookieEchoChunk* cookie_echo = (SctpCookieEchoChunk*)out_packet->chunks;
         SctpChunkParam* param = NULL;
+        size_t params_len = chunk_len - sizeof(SctpInitChunk);
+        size_t param_len;
+        uint8_t* params = (uint8_t*)init_ack->param;
         sctp->verification_tag = init_ack->initiate_tag;
-        int type;
-        // find cookie
-        uint8_t* cookie = NULL;
-        cookie = (uint8_t*)&init_ack->param[0];
-        for (int i = 0; i < init_ack->common.length - 20; i += 2) {
-          type = ntohs(*(uint16_t*)&cookie[i]);
-          // find cookie param
-          if (type == 0x07) {
-            param = (SctpChunkParam*)&cookie[i];
+        for (size_t i = 0; i + sizeof(SctpChunkParam) <= params_len;) {
+          SctpChunkParam* p = (SctpChunkParam*)&params[i];
+          param_len = ntohs(p->length);
+          if (param_len < sizeof(SctpChunkParam) || i + param_len > params_len) {
+            return;
+          }
+          if (ntohs(p->type) == SCTP_PARAM_STATE_COOKIE) {
+            param = p;
             break;
           }
+          i += 4 * ((param_len + 3) / 4);
+        }
+        if (param == NULL) {
+          return;
+        }
+        param_len = ntohs(param->length);
+        if (sizeof(SctpHeader) + sizeof(SctpCookieEchoChunk) + param_len > sizeof(sctp->buf)) {
+          return;
         }
 
         cookie_echo->common.type = SCTP_COOKIE_ECHO;
         cookie_echo->common.flags = 0x00;
-        // cookie echo: type + flag + length (4 bytes) + cookie
-        cookie_echo->common.length = htons(ntohs(param->length));
-        // param: type + length (4 bytes) + cookie
-        memcpy(cookie_echo->cookie, param->value, ntohs(param->length) - 4);
-        length = ntohs(cookie_echo->common.length) + sizeof(SctpHeader);
+        cookie_echo->common.length = htons(param_len);
+        memcpy(cookie_echo->cookie, param->value, param_len - sizeof(SctpChunkParam));
+        length = param_len + sizeof(SctpHeader);
       } break;
       case SCTP_SACK:
         if (chunk_len < sizeof(SctpSackChunk)) {
