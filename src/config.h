@@ -45,6 +45,17 @@
 #define CONFIG_SDP_BUFFER_SIZE 8096
 #endif
 
+// Resolve remote host candidates obfuscated as mDNS ".local" names. When
+// disabled they are ignored: a peer on the same network is still reached
+// through the peer reflexive address learned from its connectivity checks.
+#ifndef CONFIG_RESOLVE_MDNS_CANDIDATES
+#if CONFIG_USE_ZEPHYR
+#define CONFIG_RESOLVE_MDNS_CANDIDATES 0
+#else
+#define CONFIG_RESOLVE_MDNS_CANDIDATES 1
+#endif
+#endif
+
 #ifndef CONFIG_MQTT_BUFFER_SIZE
 #define CONFIG_MQTT_BUFFER_SIZE 4096
 #endif
