@@ -51,9 +51,7 @@ void stun_msg_create(StunMessage* msg, uint16_t type) {
   header->type = htons(type);
   header->length = 0;
   header->magic_cookie = htonl(MAGIC_COOKIE);
-  header->transaction_id[0] = htonl(CRC32_TABLE[1]);
-  header->transaction_id[1] = htonl(CRC32_TABLE[2]);
-  header->transaction_id[2] = htonl(CRC32_TABLE[3]);
+  utils_random_bytes((uint8_t*)header->transaction_id, sizeof(header->transaction_id));
   msg->size = sizeof(StunHeader);
 }
 
