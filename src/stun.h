@@ -92,6 +92,7 @@ struct StunMessage {
   char nonce[64];
   Address mapped_addr;
   Address relayed_addr;
+  int use_candidate;
   uint8_t buf[STUN_ATTR_BUF_SIZE];
   size_t size;
 };

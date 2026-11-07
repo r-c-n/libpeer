@@ -66,6 +66,10 @@ struct Agent {
   uint8_t binding_request_transaction_id[12];
   int binding_request_pending;
 
+  Address prflx_addr;
+  uint8_t prflx_transaction_id[12];
+  int prflx_pending;
+
   AgentMode mode;
 
   IceCandidatePair candidate_pairs[AGENT_MAX_CANDIDATE_PAIRS];
