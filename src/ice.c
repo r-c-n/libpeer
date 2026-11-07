@@ -120,7 +120,14 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description, c
 
   addr_set_port(&candidate->addr, port);
 
-  if (strstr(addrstring, "local") != NULL) {
+  size_t addrlen = strlen(addrstring);
+
+  if (addrlen > strlen(".local") &&
+      strcmp(addrstring + addrlen - strlen(".local"), ".local") == 0) {
+    if (!CONFIG_RESOLVE_MDNS_CANDIDATES) {
+      LOGD("Ignoring mDNS candidate %s", addrstring);
+      return -1;
+    }
     if (mdns_resolve_addr(addrstring, &candidate->addr) == 0) {
       LOGW("Failed to resolve mDNS address");
       return -1;
