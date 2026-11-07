@@ -314,6 +314,10 @@ int stun_probe(uint8_t* buf, size_t size) {
     return -1;
   }
 
+  if (size > STUN_ATTR_BUF_SIZE || ntohs(header->length) + sizeof(StunHeader) != size) {
+    return -1;
+  }
+
   return 0;
 }
 
@@ -352,6 +356,10 @@ StunMsgType stun_is_stun_msg(uint8_t *buf, size_t size) {
 #endif
 int stun_msg_is_valid(uint8_t* buf, size_t size, char* password) {
   StunMessage msg;
+
+  if (size > sizeof(msg.buf) || size < sizeof(StunHeader) + 2 * sizeof(StunAttribute) + 20 + 4) {
+    return -1;
+  }
 
   memcpy(msg.buf, buf, size);
 

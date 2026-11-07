@@ -431,7 +431,7 @@ int agent_recv(Agent* agent, uint8_t* buf, int len) {
   int ret = -1;
   StunMessage stun_msg;
   Address addr;
-  if ((ret = agent_socket_recv(agent, &addr, buf, len)) > 0 && stun_probe(buf, len) == 0) {
+  if ((ret = agent_socket_recv(agent, &addr, buf, len)) > 0 && stun_probe(buf, ret) == 0) {
     memcpy(stun_msg.buf, buf, ret);
     stun_msg.size = ret;
     stun_parse_msg_buf(&stun_msg);
