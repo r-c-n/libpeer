@@ -486,13 +486,26 @@ void agent_set_remote_description(Agent* agent, char* description) {
       }
     }
     if (strncmp(line_start, "a=ice-ufrag:", strlen("a=ice-ufrag:")) == 0) {
-      strncpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), line_end - line_start - strlen("a=ice-ufrag:"));
+      size_t len = line_end - line_start - strlen("a=ice-ufrag:");
+      if (len > ICE_UFRAG_LENGTH) {
+        LOGE("Remote ufrag too long");
+        continue;
+      }
+      memcpy(agent->remote_ufrag, line_start + strlen("a=ice-ufrag:"), len);
+      agent->remote_ufrag[len] = '\0';
 
     } else if (strncmp(line_start, "a=ice-pwd:", strlen("a=ice-pwd:")) == 0) {
-      strncpy(agent->remote_upwd, line_start + strlen("a=ice-pwd:"), line_end - line_start - strlen("a=ice-pwd:"));
+      size_t len = line_end - line_start - strlen("a=ice-pwd:");
+      if (len > ICE_UPWD_LENGTH) {
+        LOGE("Remote pwd too long");
+        continue;
+      }
+      memcpy(agent->remote_upwd, line_start + strlen("a=ice-pwd:"), len);
+      agent->remote_upwd[len] = '\0';
 
     } else if (strncmp(line_start, "a=candidate:", strlen("a=candidate:")) == 0) {
-      if (ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
+      if (agent->remote_candidates_count < AGENT_MAX_CANDIDATES &&
+          ice_candidate_from_description(&agent->remote_candidates[agent->remote_candidates_count], line_start, line_end) == 0) {
         for (i = 0; i < agent->remote_candidates_count; i++) {
           if (strcmp(agent->remote_candidates[i].foundation, agent->remote_candidates[agent->remote_candidates_count].foundation) == 0) {
             break;
