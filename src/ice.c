@@ -90,7 +90,7 @@ int ice_candidate_from_description(IceCandidate* candidate, char* description, c
 
   // a=candidate:448736988 1 udp 2122260223 172.17.0.1 49250 typ host generation 0 network-id 1 network-cost 50
   // a=candidate:udpcandidate 1 udp 120 192.168.1.102 8000 typ host
-  if (sscanf(candidate_start, "%s %d %s %" PRIu32 " %s %" PRIu32 " typ %s",
+  if (sscanf(candidate_start, "%32s %d %32s %" PRIu32 " %45s %" PRIu32 " typ %15s",
              candidate->foundation,
              &candidate->component,
              candidate->transport,
