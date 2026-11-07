@@ -130,6 +130,7 @@ void stun_parse_msg_buf(StunMessage* msg) {
 
   uint8_t mask[16];
 
+  msg->use_candidate = 0;
   msg->stunclass = ntohs(header->type);
   if ((msg->stunclass & STUN_CLASS_ERROR) == STUN_CLASS_ERROR) {
     msg->stunclass = STUN_CLASS_ERROR;
@@ -199,7 +200,7 @@ void stun_parse_msg_buf(StunMessage* msg) {
       case STUN_ATTR_TYPE_PRIORITY:
         break;
       case STUN_ATTR_TYPE_USE_CANDIDATE:
-        // LOGD("Use Candidate");
+        msg->use_candidate = 1;
         break;
       case STUN_ATTR_TYPE_FINGERPRINT:
         memcpy(&msg->fingerprint, attr->value, ntohs(attr->length));

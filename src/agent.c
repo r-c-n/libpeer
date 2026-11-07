@@ -346,24 +346,26 @@ static void agent_create_binding_request(Agent* agent, StunMessage* msg) {
   stun_msg_finish(msg, STUN_CREDENTIAL_SHORT_TERM, agent->remote_upwd, strlen(agent->remote_upwd));
 }
 
-int agent_send_binding_request(Agent* agent) {
+static int agent_send_check(Agent* agent, Address* addr, uint8_t* transaction_id) {
   StunMessage msg;
   StunHeader* header;
-  int ret;
 
+  memset(&msg, 0, sizeof(msg));
+  agent_create_binding_request(agent, &msg);
+  header = (StunHeader*)msg.buf;
+  memcpy(transaction_id, header->transaction_id, sizeof(header->transaction_id));
+  return agent_socket_send(agent, addr, msg.buf, msg.size);
+}
+
+int agent_send_binding_request(Agent* agent) {
   if (agent->nominated_pair == NULL) {
     return -1;
   }
 
-  memset(&msg, 0, sizeof(msg));
-  agent_create_binding_request(agent, &msg);
   agent->binding_request_sent_time = ports_get_epoch_time();
-  header = (StunHeader*)msg.buf;
-  memcpy(agent->binding_request_transaction_id, header->transaction_id,
-         sizeof(agent->binding_request_transaction_id));
   agent->binding_request_pending = 1;
-  ret = agent_socket_send(agent, &agent->nominated_pair->remote->addr, msg.buf, msg.size);
-  return ret;
+  return agent_send_check(agent, &agent->nominated_pair->remote->addr,
+                          agent->binding_request_transaction_id);
 }
 
 void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* addr) {
@@ -376,6 +378,19 @@ void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* ad
         memcpy(agent->transaction_id, header->transaction_id, sizeof(header->transaction_id));
         agent_create_binding_response(agent, &msg, addr);
         agent_socket_send(agent, addr, msg.buf, msg.size);
+
+        /*
+         * The controlling agent nominates the pair to use with
+         * USE-CANDIDATE, possibly from a peer reflexive address that is
+         * not among the remote candidates. Switch to that address once
+         * a check of our own to it succeeds.
+         */
+        if (stun_msg->use_candidate && agent->nominated_pair != NULL &&
+            !addr_equal(&agent->nominated_pair->remote->addr, addr)) {
+          memcpy(&agent->prflx_addr, addr, sizeof(Address));
+          agent->prflx_pending = 1;
+          agent_send_check(agent, addr, agent->prflx_transaction_id);
+        }
       }
       break;
     default:
@@ -384,13 +399,25 @@ void agent_process_stun_request(Agent* agent, StunMessage* stun_msg, Address* ad
 }
 
 void agent_process_stun_response(Agent* agent, StunMessage* stun_msg) {
+  StunHeader* header = (StunHeader*)stun_msg->buf;
+  char addr_string[ADDRSTRLEN];
+
   switch (stun_msg->stunmethod) {
     case STUN_METHOD_BINDING:
-      if (stun_msg_is_valid(stun_msg->buf, stun_msg->size, agent->remote_upwd) == 0 &&
-          agent->binding_request_pending &&
-          memcmp(((StunHeader*)stun_msg->buf)->transaction_id,
-                 agent->binding_request_transaction_id,
-                 sizeof(agent->binding_request_transaction_id)) == 0) {
+      if (stun_msg_is_valid(stun_msg->buf, stun_msg->size, agent->remote_upwd) != 0 ||
+          agent->nominated_pair == NULL) {
+        break;
+      }
+      if (agent->prflx_pending &&
+          memcmp(header->transaction_id, agent->prflx_transaction_id,
+                 sizeof(agent->prflx_transaction_id)) == 0) {
+        addr_to_string(&agent->prflx_addr, addr_string, sizeof(addr_string));
+        LOGI("Peer nominated %s:%d, switching remote address", addr_string, agent->prflx_addr.port);
+        memcpy(&agent->nominated_pair->remote->addr, &agent->prflx_addr, sizeof(Address));
+        agent->prflx_pending = 0;
+      } else if (agent->binding_request_pending &&
+                 memcmp(header->transaction_id, agent->binding_request_transaction_id,
+                        sizeof(agent->binding_request_transaction_id)) == 0) {
         agent->nominated_pair->state = ICE_CANDIDATE_STATE_SUCCEEDED;
         agent->binding_request_pending = 0;
       }
