@@ -101,7 +101,7 @@ void stun_msg_create(StunMessage* msg, uint16_t type);
 
 int stun_set_mapped_address(char* value, uint8_t* mask, Address* addr);
 
-void stun_get_mapped_address(char* value, uint8_t* mask, Address* addr);
+void stun_get_mapped_address(char* value, size_t length, uint8_t* mask, Address* addr);
 
 void stun_msg_parse(StunMessage* msg, uint8_t* buf, size_t len);
 
