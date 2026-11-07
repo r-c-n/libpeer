@@ -55,6 +55,8 @@ void peer_log(char* level_tag, const char* file_name, int line_number, const cha
 
 #define ALIGN32(num) ((num + 3) & ~3)
 
+void utils_random_bytes(uint8_t* buf, size_t len);
+
 void utils_random_string(char* s, const int len);
 
 void utils_get_hmac_sha1(const char* input, size_t input_len, const char* key, size_t key_len, unsigned char* output);

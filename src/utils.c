@@ -9,6 +9,26 @@
 #if MBEDTLS_VERSION_NUMBER >= 0x04000000
 #include "psa/crypto.h"
 #endif
+#if CONFIG_USE_ZEPHYR
+#include <zephyr/random/random.h>
+#endif
+
+void utils_random_bytes(uint8_t* buf, size_t len) {
+#if CONFIG_USE_ZEPHYR
+  sys_csrand_get(buf, len);
+#else
+  static int seeded = 0;
+
+  if (!seeded) {
+    srand(time(NULL));
+    seeded = 1;
+  }
+
+  for (size_t i = 0; i < len; i++) {
+    buf[i] = rand();
+  }
+#endif
+}
 
 void utils_random_string(char* s, const int len) {
   int i;
@@ -18,10 +38,10 @@ void utils_random_string(char* s, const int len) {
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
       "abcdefghijklmnopqrstuvwxyz";
 
-  srand(time(NULL));
+  utils_random_bytes((uint8_t*)s, len);
 
   for (i = 0; i < len; ++i) {
-    s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+    s[i] = alphanum[(uint8_t)s[i] % (sizeof(alphanum) - 1)];
   }
 
   s[len] = '\0';
